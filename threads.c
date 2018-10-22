@@ -129,7 +129,7 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start_
 
 		//If first thread created, setup the subsystem
 		if(activeThreads == 1){
-			initialize_subsystem();
+			initialize_sys();
 		}
 
 		//Schedule
@@ -144,11 +144,9 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start_
 void scheduler(){
 	//Setjmp returns 0 on direct invocation
 	if(setjmp(allThreads[currThread].registers) == 0){
-
-
 		//Free the stack space of any exited threads and set status to unused every time we leave the main thread
 		if(currThread == 0){
-				int i;
+			int i;
 			for(i = 0; i < MAX_THREADS; i++){
 				if(allThreads[i].status == EXITED){
 					if(allThreads[i].stack != NULL){
@@ -177,10 +175,7 @@ void scheduler(){
 		}
 
 		//Unblock signal
-		sigset_t signal_set;
-		sigemptyset(&signal_set);
-		sigaddset(&signal_set, SIGALRM);
-		sigprocmask(SIG_UNBLOCK, &signal_set, NULL);
+		signal_unblock();
 
 		//Context switch
 		longjmp(allThreads[currThread].registers, 1);
@@ -189,15 +184,12 @@ void scheduler(){
 	//If nonzero setjmp, longjmp returning to setjmp above
 	}else{
 		//Unblock and run thread
-		sigset_t sigset1;
-		sigemptyset(&sigset1);
-		sigaddset(&sigset1, SIGALRM );
-		sigprocmask(SIG_UNBLOCK, &sigset1, NULL);
+		signal_unblock();
 
 	}
 }
 
-void initialize_subsystem(){
+void initialize_sys(){
         //Adding TCB for main program
         allThreads[0].id = 0;
         allThreads[0].status = READY;
@@ -208,10 +200,10 @@ void initialize_subsystem(){
         activeThreads++;
 
         //Initializing signal & form connection with scheduler
-
         struct sigaction sigAct;
         memset(&sigAct, 0, sizeof(sigAct));
         sigAct.sa_sigaction = scheduler;
+        sigAct.sa_flags = SA_NODEFER;
         sigaction(SIGALRM, &sigAct, NULL);
 
         //Start the timer to go off every 50ms
@@ -228,22 +220,32 @@ void initialize_subsystem(){
 }
 
 void pthread_exit(void *value_ptr){
-	//Block SIGALRM
-	sigset_t sigSet;
-	sigemptyset(&sigSet);
-	sigaddset(&sigSet, SIGALRM);
-	sigprocmask(SIG_BLOCK, &sigSet, NULL);
+	//Block signal while thread exiting
+	signal_block();
 
 	currThreads[currThread] = 0;
 	allThreads[currThread].status = EXITED;
 	allThreads[currThread].exit_status = value_ptr;
-
 
 	scheduler();
 
 	//Should never reach this line
 	__builtin_unreachable();
 
+}
+
+void signal_unblock(){
+	sigset_t sigset1;
+	sigemptyset(&sigset1);
+	sigaddset(&sigset1, SIGALRM);
+	sigprocmask(SIG_UNBLOCK, &sigset1, NULL);
+}
+
+void signal_block(){
+	sigset_t sigset1;
+	sigemptyset(&sigset1);
+	sigaddset(&sigset1, SIGALRM);
+	sigprocmask(SIG_BLOCK, &sigset1, NULL);
 }
 
 
