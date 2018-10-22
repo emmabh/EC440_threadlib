@@ -78,8 +78,6 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start_
 
 	//Starting from the first thread, check if any slots are open
 	for(i = 1; i < MAX_THREADS; i++){
-		if(i >= MAX_THREADS)
-			i = 0;
 		if(currThreads[i] == 0)
 		{
 			newThread = i;
@@ -120,6 +118,7 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start_
 		//Save state of empty buffer
 		setjmp(allThreads[newThread].registers);
 
+		//Number of active threads increment
 		activeThreads++;
 
 		//Set the slot to full
@@ -217,7 +216,7 @@ void initialize_subsystem(){
 
         //Start the timer to go off every 50ms
         struct itimerval timer;
-        timer.it_value.tv_usec = 10;
+        timer.it_value.tv_usec = FREQ_MS*1000;
         timer.it_value.tv_sec = 0;
         timer.it_interval.tv_usec = FREQ_MS*1000;
         timer.it_interval.tv_sec = 0;
